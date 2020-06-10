@@ -38,6 +38,14 @@ func main() {
 	intermediate := []mr.KeyValue{}
 	for _, filename := range os.Args[2:] {
 		file, err := os.Open(filename)
+		// 测试open是否互斥
+		
+		go func() {
+			file, err := os.Open(filename)
+			fmt.Println("文件被占用： ", err)
+			file.Close()
+		}()
+		
 		if err != nil {
 			log.Fatalf("cannot open %v", filename)
 		}

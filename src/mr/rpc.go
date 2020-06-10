@@ -23,6 +23,34 @@ type ExampleReply struct {
 }
 
 // Add your RPC definitions here.
+type GetFileArgs struct {
+	TaskType int
+}
+
+type GetFileReply struct {
+	Id int
+	FileName string
+	NMap int
+	NReduce int
+}
+
+type SetStateArgs struct {
+	TaskType int
+	Id int
+	State int
+}
+
+type SetStateReply struct {
+	Success bool
+}
+
+type TaskFinishedArgs struct {
+	TaskType int
+}
+
+type TaskFinishedReply struct {
+	TaskFinished bool
+}
 
 
 // Cook up a unique-ish UNIX-domain socket name
