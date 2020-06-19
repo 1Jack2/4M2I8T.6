@@ -1,0 +1,191 @@
+2020/06/19 11:38:11 server  0 electionTimeout  903ms
+2020/06/19 11:38:11 server  1 electionTimeout  775ms
+2020/06/19 11:38:11 server  2 electionTimeout  1.158s
+Test (2A): initial election ...
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 [0] start election term<1> 1.000831548s ******************* 903ms
+2020/06/19 11:38:12 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:12 [1] start election term<1> 1.000712781s ******************* 775ms
+2020/06/19 11:38:12 create goroutine: [1] asks [2] for vote
+2020/06/19 11:38:12 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:12 [0]<1> is ready to send RequestVote
+2020/06/19 11:38:12 create goroutine: [1] asks [0] for vote
+2020/06/19 11:38:12 [1]<1> is ready to send RequestVote
+2020/06/19 11:38:12 [1]<1> is ready to send RequestVote
+2020/06/19 11:38:12 [0]<1> is ready to send RequestVote
+2020/06/19 11:38:12 [2]<1> vote for [0]<1>
+2020/06/19 11:38:12 [1](cId: 1) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:12 [1](cId: 1) request vote [2](cId: 0): *CandidateId* fail
+2020/06/19 11:38:12 [0]<1> become LEADER
+2020/06/19 11:38:12 [0](cId: 0) request vote [1](cId: 1): *CandidateId* fail
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:12 call function GetState
+2020/06/19 11:38:14 call function GetState
+2020/06/19 11:38:14 call function GetState
+2020/06/19 11:38:14 call function GetState
+2020/06/19 11:38:15 call function GetState
+2020/06/19 11:38:15 call function GetState
+2020/06/19 11:38:15 call function GetState
+  ... Passed --   3.6  3   28    7130    0
+2020/06/19 11:38:15 server  0 electionTimeout  1.051s
+2020/06/19 11:38:15 server  1 electionTimeout  784ms
+2020/06/19 11:38:15 server  2 electionTimeout  1.368s
+Test (2A): election after network failure ...
+2020/06/19 11:38:15 call function GetState
+2020/06/19 11:38:15 call function GetState
+2020/06/19 11:38:15 call function GetState
+2020/06/19 11:38:16 [1] start election term<1> 1.001282967s ******************* 784ms
+2020/06/19 11:38:16 create goroutine: [1] asks [2] for vote
+2020/06/19 11:38:16 create goroutine: [1] asks [0] for vote
+2020/06/19 11:38:16 [1]<1> is ready to send RequestVote
+2020/06/19 11:38:16 [1]<1> is ready to send RequestVote
+2020/06/19 11:38:16 [2]<1> vote for [1]<1>
+2020/06/19 11:38:16 [0]<1> vote for [1]<1>
+2020/06/19 11:38:16 [1]<1> become LEADER
+2020/06/19 11:38:16 call function GetState
+2020/06/19 11:38:16 call function GetState
+2020/06/19 11:38:16 call function GetState
+2020/06/19 11:38:16 TESTACTIN: found 1 as leader1
+2020/06/19 11:38:16 TESTACTION: 1 (leader1) disconnects
+2020/06/19 11:38:16 call function GetState
+2020/06/19 11:38:16 call function GetState
+2020/06/19 11:38:17 call function GetState
+2020/06/19 11:38:17 call function GetState
+2020/06/19 11:38:17 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:17 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:17 [0] start election term<2> 1.494385535s ******************* 1.051s
+2020/06/19 11:38:17 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:17 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:17 [0]<2> is ready to send RequestVote
+2020/06/19 11:38:17 [0]<2> is ready to send RequestVote
+2020/06/19 11:38:17 [2] start election term<2> 1.498854392s ******************* 1.368s
+2020/06/19 11:38:17 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:17 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:17 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:17 [2]<2> is ready to send RequestVote
+2020/06/19 11:38:17 [2]<2> is ready to send RequestVote
+2020/06/19 11:38:17 call function GetState
+2020/06/19 11:38:17 call function GetState
+2020/06/19 11:38:17 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:18 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:18 [0] start election term<3> 501.649003ms ******************* 302ms
+2020/06/19 11:38:18 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:18 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:18 [0]<3> is ready to send RequestVote
+2020/06/19 11:38:18 [0]<3> is ready to send RequestVote
+2020/06/19 11:38:18 [2] start election term<3> 502.286363ms ******************* 308ms
+2020/06/19 11:38:18 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:18 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:18 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:18 [2]<3> is ready to send RequestVote
+2020/06/19 11:38:18 [2]<3> is ready to send RequestVote
+2020/06/19 11:38:18 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:18 call function GetState
+2020/06/19 11:38:18 call function GetState
+2020/06/19 11:38:18 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:18 RPC fail: [0]<3> send request vote to [1] fail
+2020/06/19 11:38:18 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:18 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:18 call function GetState
+2020/06/19 11:38:18 call function GetState
+2020/06/19 11:38:18 [0] start election term<4> 502.254852ms ******************* 436ms
+2020/06/19 11:38:18 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:18 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:18 [0]<4> is ready to send RequestVote
+2020/06/19 11:38:18 [0]<4> is ready to send RequestVote
+2020/06/19 11:38:18 [2] start election term<4> 501.328068ms ******************* 458ms
+2020/06/19 11:38:18 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:18 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:18 [2]<4> is ready to send RequestVote
+2020/06/19 11:38:18 [2]<4> is ready to send RequestVote
+2020/06/19 11:38:18 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:18 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:19 call function GetState
+2020/06/19 11:38:19 call function GetState
+2020/06/19 11:38:19 [0] start election term<5> 501.816186ms ******************* 450ms
+2020/06/19 11:38:19 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:19 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:19 [0]<5> is ready to send RequestVote
+2020/06/19 11:38:19 [0]<5> is ready to send RequestVote
+2020/06/19 11:38:19 [2] start election term<5> 502.48998ms ******************* 360ms
+2020/06/19 11:38:19 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:19 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:19 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:19 [2]<5> is ready to send RequestVote
+2020/06/19 11:38:19 [2]<5> is ready to send RequestVote
+2020/06/19 11:38:19 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:19 call function GetState
+2020/06/19 11:38:19 call function GetState
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:19 [0] start election term<6> 501.880055ms ******************* 306ms
+2020/06/19 11:38:19 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:19 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:19 [0]<6> is ready to send RequestVote
+2020/06/19 11:38:19 [0]<6> is ready to send RequestVote
+2020/06/19 11:38:19 [2] start election term<6> 501.799731ms ******************* 356ms
+2020/06/19 11:38:19 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:19 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:19 [2]<6> is ready to send RequestVote
+2020/06/19 11:38:19 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:19 [2]<6> is ready to send RequestVote
+2020/06/19 11:38:19 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:19 RPC fail: [0]<6> send request vote to [1] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:19 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:20 call function GetState
+2020/06/19 11:38:20 call function GetState
+2020/06/19 11:38:20 [0] start election term<7> 502.369187ms ******************* 443ms
+2020/06/19 11:38:20 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:20 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:20 [0]<7> is ready to send RequestVote
+2020/06/19 11:38:20 [0]<7> is ready to send RequestVote
+2020/06/19 11:38:20 [2] start election term<7> 501.890945ms ******************* 386ms
+2020/06/19 11:38:20 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:20 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:20 [2]<7> is ready to send RequestVote
+2020/06/19 11:38:20 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:20 [2]<7> is ready to send RequestVote
+2020/06/19 11:38:20 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:20 call function GetState
+2020/06/19 11:38:20 call function GetState
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:20 [0] start election term<8> 501.828529ms ******************* 308ms
+2020/06/19 11:38:20 create goroutine: [0] asks [2] for vote
+2020/06/19 11:38:20 create goroutine: [0] asks [1] for vote
+2020/06/19 11:38:20 [0]<8> is ready to send RequestVote
+2020/06/19 11:38:20 [0]<8> is ready to send RequestVote
+2020/06/19 11:38:20 [2] start election term<8> 502.119498ms ******************* 458ms
+2020/06/19 11:38:20 create goroutine: [2] asks [1] for vote
+2020/06/19 11:38:20 create goroutine: [2] asks [0] for vote
+2020/06/19 11:38:20 [0](cId: 0) request vote [2](cId: 2): *CandidateId* fail
+2020/06/19 11:38:20 [2]<8> is ready to send RequestVote
+2020/06/19 11:38:20 [2]<8> is ready to send RequestVote
+2020/06/19 11:38:20 [2](cId: 2) request vote [0](cId: 0): *CandidateId* fail
+2020/06/19 11:38:20 RPC fail: [1] sent heartbeat to [0] fail
+2020/06/19 11:38:21 RPC fail: [0]<8> send request vote to [1] fail
+2020/06/19 11:38:21 RPC fail: [1] sent heartbeat to [2] fail
+2020/06/19 11:38:21 RPC fail: [2]<8> send request vote to [1] fail
+2020/06/19 11:38:21 call function GetState
+2020/06/19 11:38:21 call function GetState
+--- FAIL: TestReElection2A (5.84s)
+    config.go:332: expected one leader, got none
+FAIL
+exit status 1
+FAIL	_/home/jack/Program/6.824/src/raft	9.445s

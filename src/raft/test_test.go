@@ -98,11 +98,13 @@ func TestBasicAgree2B(t *testing.T) {
 	iters := 3
 	for index := 1; index < iters+1; index++ {
 		nd, _ := cfg.nCommitted(index)
+		DPrintf("TESTACTION: --------------------------------------")
 		if nd > 0 {
 			t.Fatalf("some have committed before Start()")
 		}
-
+		DPrintf("TESTACTION: --------------------------------------")
 		xindex := cfg.one(index*100, servers, false)
+		DPrintf("TESTACTION: --------------------------------------")
 		if xindex != index {
 			t.Fatalf("got index %v but expected %v", xindex, index)
 		}

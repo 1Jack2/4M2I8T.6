@@ -71,6 +71,7 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	applyCh chan ApplyMsg
 	electionTimeout time.Duration
 	lastHeartbeat time.Time
 	state int
@@ -86,7 +87,7 @@ type Raft struct {
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
-	DPrintf("call function GetState")
+	// DPrintf("call function GetState")
 	var term int
 	var isleader bool
 	// Your code here (2A).
@@ -144,6 +145,7 @@ type AppendEntriesArgs struct {
 	PrevLogTerm int
 	Entries []LogEntry
 	LeaderCommit int
+
 }
 
 type AppendEntriesReply struct {
@@ -304,6 +306,20 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 
 	// Your code here (2B).
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	DPrintf("[%d]<%d> call func Start()", rf.me, rf.currentTerm)
+
+	term = rf.currentTerm
+	if rf.state == LEADER {
+		isLeader = true
+		index = len(rf.log)
+		rf.log = append(rf.log, LogEntry{
+									Command: command, 
+									Term: rf.currentTerm,
+								})
+	}
 
 	return index, term, isLeader
 }
@@ -348,6 +364,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
+	rf.applyCh = applyCh
 	rf.electionTimeout = time.Duration(500 + rand.Intn(1000)) * time.Millisecond 
 	//rf.electionTimeout = time.Duration(500 + me * 500) * time.Millisecond
 	DPrintln("server ", rf.me, "electionTimeout ", rf.electionTimeout)
@@ -366,6 +383,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// heartbeat
 	go sendHeartbeat(rf)
 
+	// apply
+	go checkApply(rf)
+
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
@@ -374,9 +394,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 }
 
 func checkElection(rf *Raft) {
-	mu := sync.Mutex{}
+	// mu := sync.Mutex{}
 	for !rf.killed() {
 		// fmt.Println(time.Now(), rf.me, "check electionTimeout")
+		mu := sync.Mutex{}
 		grantedCnt := 1 // vote self
 		rf.mu.Lock()
 		mu.Lock()
@@ -389,14 +410,14 @@ func checkElection(rf *Raft) {
 			rf.currentTerm++
 			rf.votedFor = rf.me
 			rf.lastHeartbeat = time.Now()
-			rf.electionTimeout = time.Duration(300 + rand.Intn(200)) * time.Millisecond 
+			rf.electionTimeout = time.Duration(300 + rand.Intn(1000)) * time.Millisecond 
 			mu.Unlock()
 			rf.mu.Unlock()
 			for i := len(rf.peers) - 1; i >= 0; i-- {
 				if i == rf.me {
 					continue
 				}
-				DPrintf("create goroutine: [%d] asks [%d] for vote", rf.me, i)
+				//DPrintf("create goroutine: [%d] asks [%d] for vote", rf.me, i)
 				go func(i int) {
 					//DPrintf("[%d]<%d> is acquiring a lock", rf.me, rf.currentTerm)
 					rf.mu.Lock()
@@ -409,7 +430,7 @@ func checkElection(rf *Raft) {
 					if requestVoteArgs.LastLogIndex >= 0 {
 						requestVoteArgs.LastLogTerm = rf.log[len(rf.log) - 1].Term
 					}
-					DPrintf("[%d]<%d> is ready to send RequestVote", rf.me, rf.currentTerm)
+					//DPrintf("[%d]<%d> is ready to send RequestVote", rf.me, rf.currentTerm)
 					rf.mu.Unlock()
 					requestVoteReply := &RequestVoteReply{}
 					ok := rf.sendRequestVote(i, requestVoteArgs, requestVoteReply)
@@ -466,17 +487,23 @@ func checkElection(rf *Raft) {
 
 func sendHeartbeat(rf *Raft) {
 	for !rf.killed() {
+		
+
 		rf.mu.Lock()
-		currentState := rf.state
-		currentTerm := rf.currentTerm
-		// appendCnt := 1
-		rf.mu.Unlock()	
-		if currentState == LEADER {
+		
+		if rf.state == LEADER {
+			mu := sync.Mutex{}
+			replCount := 1
+			if len(rf.log) - 1 == rf.commitIndex {
+				rf.log = append(rf.log, LogEntry{Term: rf.currentTerm})
+			}
+			// currentState := rf.state
+			currentTerm := rf.currentTerm
+			currentLogLen := len(rf.log)
+			currentCommitIndex := rf.commitIndex
+			rf.mu.Unlock()
 			for i := len(rf.peers) - 1; i >= 0; i-- {
 				if i == rf.me {
-					rf.mu.Lock()
-					rf.log = append(rf.log, LogEntry{Term: currentTerm})
-					rf.mu.Unlock()
 					continue
 				}
 				go func(i int) {
@@ -492,15 +519,20 @@ func sendHeartbeat(rf *Raft) {
 							Term: 				currentTerm,
 							LeaderId: 			rf.me,
 							PrevLogIndex: 		rf.nextIndex[i] - 1,
-							LeaderCommit: 		rf.commitIndex,
+							LeaderCommit: 		currentCommitIndex,
 						}
 						if appendEntriesArgs.PrevLogIndex >= 0 {
 							appendEntriesArgs.PrevLogTerm = rf.log[appendEntriesArgs.PrevLogIndex].Term
 						}
-						if rf.nextIndex[i] > 0 {
-							appendEntriesArgs.Entries = rf.log[rf.nextIndex[i]:]
+						if rf.nextIndex[i] < currentLogLen {
+							if rf.nextIndex[i] >= 0 {
+								appendEntriesArgs.Entries = rf.log[rf.nextIndex[i] : currentLogLen]
+							} else {
+								appendEntriesArgs.Entries = rf.log[: currentLogLen]
+							}
 						}
 						rf.mu.Unlock()
+
 						appendEntriesReply := &AppendEntriesReply{}
 						ok = rf.sendAppendEntries(i, appendEntriesArgs, appendEntriesReply)
 						
@@ -526,15 +558,47 @@ func sendHeartbeat(rf *Raft) {
 							rf.nextIndex[i]--
 							DPrintf("%d sent heartbeat to %d fails", rf.me, i);
 						} else {
-							rf.nextIndex[i] = len(rf.log)
-							rf.matchIndex[i] = len(rf.log) - 1
+							rf.matchIndex[i] = appendEntriesArgs.PrevLogIndex + len(appendEntriesArgs.Entries)
+							rf.nextIndex[i] = rf.matchIndex[i] + 1
+							mu.Lock()
+							replCount++
+							nextCommitIndex := currentLogLen - 1
+							if 2 * replCount > len(rf.peers) && rf.commitIndex < nextCommitIndex {
+								rf.commitIndex = nextCommitIndex
+							}
+							mu.Unlock()
+							// rf.matchIndex[i] = len(rf.log) - 1
 							//DPrintf("[%d] --> [%d]", rf.me, i);
 						}
 						rf.mu.Unlock()
 					}
 				}(i)
 			}
+		} else {
+			rf.mu.Unlock()	
 		}
 		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func checkApply(rf *Raft) {
+	for !rf.killed() {
+		rf.mu.Lock()
+		if rf.lastApplied < rf.commitIndex {
+			rf.lastApplied++
+			commandIndex := rf.lastApplied
+			command := rf.log[commandIndex].Command
+			if command != nil {
+				rf.applyCh <- ApplyMsg{
+					Command:		rf.log[commandIndex].Command,
+					CommandIndex:	commandIndex,
+					CommandValid:	true,
+				}
+				DPrintf("[%d]<%d> applied log[%d]: nil ? %t", rf.me, rf.currentTerm, rf.lastApplied, rf.log[rf.lastApplied].Command == nil)
+			}
+		}
+		rf.mu.Unlock()
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }
