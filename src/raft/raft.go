@@ -71,6 +71,8 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	lastCommandIndex int
+	commandCommitIndex int
 	applyCh chan ApplyMsg
 	electionTimeout time.Duration
 	lastHeartbeat time.Time
@@ -159,7 +161,8 @@ func (rf * Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRepl
 	
 
 	if args.Term < rf.currentTerm {
-		DPrintf("%d[%d] --> %d[%d] fail", args.LeaderId, args.Term,
+		reply.Term = rf.currentTerm
+		DPrintf("[%d]<%d> --> [%d]<%d> fail", args.LeaderId, args.Term,
 				rf.me, rf.currentTerm)
 		return
 	}
@@ -173,14 +176,16 @@ func (rf * Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRepl
 	if len(rf.log) - 1 < args.PrevLogIndex {
 		return
 	}
-	if args.PrevLogIndex != -1 && rf.log[args.PrevLogIndex].Term != args.Term {
+	if rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
 		rf.log = rf.log[:args.PrevLogIndex]
-		DPrintf("%d -> %d: reslice log", args.LeaderId, rf.me)
+		DPrintf("[%d-->%d]: reslice log", args.LeaderId, rf.me)
 		return
 	}
-	for _, entry := range args.Entries {
-		rf.log = append(rf.log, entry)
-	}
+	// rf.log = rf.log[:args.PrevLogIndex + 1]
+	// for _, entry := range args.Entries {
+	// 	rf.log = append(rf.log, entry)
+	// }
+	rf.log = append(rf.log[:args.PrevLogIndex + 1], args.Entries...)
 	if args.LeaderCommit > rf.commitIndex {
 		rf.commitIndex = func(x, y int) int {
 			if (x > y) {
@@ -202,6 +207,7 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	LastCommandIndex int
 	Term int
 	CandidateId int
 	LastLogIndex int
@@ -232,22 +238,33 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		return
 	}
 	if rf.currentTerm == args.Term && rf.votedFor != -1 && rf.votedFor != args.CandidateId {
+		// 如果此recevier的log不up-to-date，则延长election timeout，等待为别人投票
+		if (args.LastLogTerm > rf.log[len(rf.log) - 1].Term ||
+		args.LastLogTerm == rf.log[len(rf.log) - 1].Term && args.LastLogIndex >= len(rf.log) - 1) {
+			rf.electionTimeout = rf.electionTimeout * 2
+		}
 		DPrintf("[%d](cId: %d) request vote [%d](cId: %d): *CandidateId* fail", 
 		args.CandidateId, args.CandidateId, rf.me, rf.votedFor)
 		reply.Term = rf.currentTerm
 		return
 	}
-	rf.currentTerm = args.Term
-	reply.Term = args.Term
 	// make sure up-to-date
-	if len(rf.log) == 0 || args.LastLogTerm > rf.log[len(rf.log) - 1].Term ||
-	args.LastLogTerm == rf.log[len(rf.log) - 1].Term && args.LastLogIndex >= len(rf.log) - 1 {
+	// args.LastCommandIndex >= rf.lastCommandIndex && 
+	if (args.LastLogTerm > rf.log[len(rf.log) - 1].Term ||
+	args.LastLogTerm == rf.log[len(rf.log) - 1].Term && args.LastLogIndex >= len(rf.log) - 1) {
+		rf.currentTerm = args.Term
+		reply.Term = args.Term
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateId
 		rf.lastHeartbeat = time.Now()
 		rf.state = FOLLOWER
+		DPrintf("[%d]<%d> vote for [%d]<%d>", rf.me, rf.currentTerm, args.CandidateId, args.Term)
+	} else {
+		DPrintf("[%d]{lastCommandIndex: %d, lastLogTerm: %d, lastLogIndex: %d}, [%d]{LastCommandIndex :%d, LastLogTerm: %d, LastLogIndex: %d}",
+		 rf.me, rf.lastCommandIndex, rf.log[len(rf.log) - 1].Term, len(rf.log) - 1,
+		 args.CandidateId, args.LastCommandIndex, args.LastLogTerm, args.LastLogIndex)
+		reply.Term = rf.currentTerm
 	}
-	DPrintf("[%d]<%d> vote for [%d]<%d>", rf.me, rf.currentTerm, args.CandidateId, args.Term)
 }
 
 //
@@ -309,16 +326,19 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	DPrintf("[%d]<%d> call func Start()", rf.me, rf.currentTerm)
+	//DPrintf("[%d]<%d> call func Start()", rf.me, rf.currentTerm)
 
 	term = rf.currentTerm
 	if rf.state == LEADER {
 		isLeader = true
-		index = len(rf.log)
+		// index = rf.commandCommitIndex + 1 //bug
+		rf.lastCommandIndex++
+		index = rf.lastCommandIndex
 		rf.log = append(rf.log, LogEntry{
 									Command: command, 
 									Term: rf.currentTerm,
 								})
+		DPrintf("[%d] Start() success index: %d, command: %v", rf.me, index, command)
 	}
 
 	return index, term, isLeader
@@ -372,8 +392,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = FOLLOWER
 	rf.currentTerm = 0
 	rf.votedFor = -1
-	rf.commitIndex = -1
-	rf.lastApplied = -1
+	rf.log = []LogEntry{LogEntry{Term: 0}} //log's first index is 1
+	rf.commitIndex = 0
+	rf.commandCommitIndex = 0
+	rf.lastCommandIndex = 0
+	rf.lastApplied = 0
 	rf.nextIndex = make([]int, len(peers))
 	rf.matchIndex = make([]int, len(peers))
 
@@ -410,7 +433,7 @@ func checkElection(rf *Raft) {
 			rf.currentTerm++
 			rf.votedFor = rf.me
 			rf.lastHeartbeat = time.Now()
-			rf.electionTimeout = time.Duration(300 + rand.Intn(1000)) * time.Millisecond 
+			rf.electionTimeout = time.Duration(300 + rand.Intn(200)) * time.Millisecond 
 			mu.Unlock()
 			rf.mu.Unlock()
 			for i := len(rf.peers) - 1; i >= 0; i-- {
@@ -423,13 +446,15 @@ func checkElection(rf *Raft) {
 					rf.mu.Lock()
 					//DPrintf("[%d]<%d> has got a lock", rf.me, rf.currentTerm)
 					requestVoteArgs := &RequestVoteArgs{
+						LastCommandIndex: rf.lastCommandIndex,
 						Term: rf.currentTerm,
 						CandidateId: rf.me,
 						LastLogIndex: len(rf.log) - 1,
+						LastLogTerm: rf.log[len(rf.log) - 1].Term,
 					}
-					if requestVoteArgs.LastLogIndex >= 0 {
-						requestVoteArgs.LastLogTerm = rf.log[len(rf.log) - 1].Term
-					}
+					// if requestVoteArgs.LastLogIndex >= 0 {
+					// 	requestVoteArgs.LastLogTerm = rf.log[len(rf.log) - 1].Term
+					// }
 					//DPrintf("[%d]<%d> is ready to send RequestVote", rf.me, rf.currentTerm)
 					rf.mu.Unlock()
 					requestVoteReply := &RequestVoteReply{}
@@ -441,7 +466,15 @@ func checkElection(rf *Raft) {
 						return
 					}
 					if requestVoteReply.Term < requestVoteArgs.Term {
-						DPrintf("[%d]: requestVoteReply.Term < rf.currentTerm", rf.me)
+						rf.mu.Lock()
+						DPrintf("[%d]: reply.Term{%d} < currentTerm{%d}", rf.me, requestVoteReply.Term, rf.currentTerm)
+						// 当前term，该candidate的log不是up-to-date，不能选为leader，故应该延长下一次选举时间，避免和别的candidate冲突
+						if requestVoteReply.Term == requestVoteArgs.Term - 1 {
+							rf.state = FOLLOWER
+							rf.state = -1
+							rf.lastHeartbeat = time.Now()	
+						}
+						rf.mu.Unlock()
 						return
 					}
 					
@@ -452,7 +485,7 @@ func checkElection(rf *Raft) {
 					
 					if requestVoteReply.Term > rf.currentTerm {
 						DPrintf("[%d]: requestVoteReply.Term > rf.currentTerm", rf.me)
-						rf.currentTerm = requestVoteArgs.Term
+						rf.currentTerm = requestVoteReply.Term
 						rf.state = FOLLOWER
 					}
 					//DPrintf("%d state %d", rf.me, rf.state)
@@ -479,7 +512,7 @@ func checkElection(rf *Raft) {
 			rf.mu.Unlock()
 		}
 		// DPrintf("[%d] election goroutine is sleeping", rf.me)
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		// term, isLeader := rf.GetState()
 		// DPrintf("term[%d] server[%d] isLeader[%t]", term, rf.me, isLeader)
 	}
@@ -519,6 +552,7 @@ func sendHeartbeat(rf *Raft) {
 							Term: 				currentTerm,
 							LeaderId: 			rf.me,
 							PrevLogIndex: 		rf.nextIndex[i] - 1,
+							// PrevLogTerm:		rf.log[rf.nextIndex[i] - 1].Term,
 							LeaderCommit: 		currentCommitIndex,
 						}
 						if appendEntriesArgs.PrevLogIndex >= 0 {
@@ -526,9 +560,15 @@ func sendHeartbeat(rf *Raft) {
 						}
 						if rf.nextIndex[i] < currentLogLen {
 							if rf.nextIndex[i] >= 0 {
-								appendEntriesArgs.Entries = rf.log[rf.nextIndex[i] : currentLogLen]
+								entriesCopy := make([]LogEntry, len(rf.log[rf.nextIndex[i] : currentLogLen]))
+								copy(entriesCopy, rf.log[rf.nextIndex[i] : currentLogLen])
+								appendEntriesArgs.Entries = entriesCopy
+								//appendEntriesArgs.Entries = rf.log[rf.nextIndex[i] : currentLogLen]
 							} else {
-								appendEntriesArgs.Entries = rf.log[: currentLogLen]
+								entriesCopy := make([]LogEntry, len(rf.log[:currentLogLen]))
+								copy(entriesCopy, rf.log[:currentLogLen])
+								appendEntriesArgs.Entries = entriesCopy
+								//appendEntriesArgs.Entries = rf.log[: currentLogLen]
 							}
 						}
 						rf.mu.Unlock()
@@ -542,7 +582,7 @@ func sendHeartbeat(rf *Raft) {
 							return
 						}
 						if !ok {
-							DPrintf("RPC fail: [%d] sent heartbeat to [%d] fail", rf.me, i)
+							//DPrintf("RPC fail: [%d] sent heartbeat to [%d] fail", rf.me, i)
 							rf.mu.Unlock()
 							continue
 						}
@@ -577,7 +617,7 @@ func sendHeartbeat(rf *Raft) {
 		} else {
 			rf.mu.Unlock()	
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -589,12 +629,19 @@ func checkApply(rf *Raft) {
 			commandIndex := rf.lastApplied
 			command := rf.log[commandIndex].Command
 			if command != nil {
-				rf.applyCh <- ApplyMsg{
-					Command:		rf.log[commandIndex].Command,
-					CommandIndex:	commandIndex,
+				rf.commandCommitIndex++
+				if rf.lastCommandIndex < rf.commandCommitIndex {
+					rf.lastCommandIndex = rf.commandCommitIndex
+				}
+				applyMsg := ApplyMsg{
+					Command:		command,
+					CommandIndex:	rf.commandCommitIndex,
 					CommandValid:	true,
 				}
-				DPrintf("[%d]<%d> applied log[%d]: nil ? %t", rf.me, rf.currentTerm, rf.lastApplied, rf.log[rf.lastApplied].Command == nil)
+				go func(applyMsg ApplyMsg) {
+					rf.applyCh <- applyMsg
+				}(applyMsg)
+				DPrintf("[%d]<%d> applied command[%d]: %v", rf.me, rf.currentTerm, rf.commandCommitIndex, command)
 			}
 		}
 		rf.mu.Unlock()

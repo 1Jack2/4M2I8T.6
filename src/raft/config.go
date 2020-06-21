@@ -445,20 +445,21 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 			cfg.mu.Unlock()
 			if rf != nil {
 				index1, _, ok := rf.Start(cmd)
+				//DPrintf("TESTACTION: index1: {%d} ", index1)
 				if ok {
 					index = index1
 					break
 				}
 			}
 		}
-
+		//DPrintln("TESTACTION: start check agreement")
 		if index != -1 {
 			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.
 			t1 := time.Now()
 			for time.Since(t1).Seconds() < 2 {
 				nd, cmd1 := cfg.nCommitted(index)
-				DPrintln("------------------", nd, "----------------", cmd1, "--------------")
+				//DPrintf("TESTACTION: func one() nd: {%d}, cmd1==nil ? %t", nd, cmd1 == nil)
 				if nd > 0 && nd >= expectedServers {
 					// committed
 					if cmd1 == cmd {

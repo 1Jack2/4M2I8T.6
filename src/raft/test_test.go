@@ -98,13 +98,13 @@ func TestBasicAgree2B(t *testing.T) {
 	iters := 3
 	for index := 1; index < iters+1; index++ {
 		nd, _ := cfg.nCommitted(index)
-		DPrintf("TESTACTION: --------------------------------------")
+		//DPrintf("TESTACTION: --------------------------------------")
 		if nd > 0 {
 			t.Fatalf("some have committed before Start()")
 		}
-		DPrintf("TESTACTION: --------------------------------------")
+		DPrintf("TESTACTION: check index {%d}", index)
 		xindex := cfg.one(index*100, servers, false)
-		DPrintf("TESTACTION: --------------------------------------")
+		DPrintf("TESTACTION: xindex: {%d} index: {%d}", xindex, index)
 		if xindex != index {
 			t.Fatalf("got index %v but expected %v", xindex, index)
 		}
@@ -269,6 +269,7 @@ loop:
 				if ok != true {
 					return
 				}
+				DPrintf("send command index {%d} to is", i)
 				is <- i
 			}(ii)
 		}
@@ -312,6 +313,7 @@ loop:
 
 		for ii := 0; ii < iters; ii++ {
 			x := 100 + ii
+			DPrintf("TESTACTION: x: %d cmds: %v", x, cmds)
 			ok := false
 			for j := 0; j < len(cmds); j++ {
 				if cmds[j] == x {
@@ -343,27 +345,33 @@ func TestRejoin2B(t *testing.T) {
 
 	cfg.one(101, servers, true)
 
+	DPrintf("TESTACTION-2B6: leader network failure")
 	// leader network failure
 	leader1 := cfg.checkOneLeader()
 	cfg.disconnect(leader1)
 
+	DPrintf("TESTACTION-2B6: make old leader try to agree on some entries")
 	// make old leader try to agree on some entries
 	cfg.rafts[leader1].Start(102)
 	cfg.rafts[leader1].Start(103)
 	cfg.rafts[leader1].Start(104)
 
+	DPrintf("TESTACTION-2B6: new leader commits, also for index=2")
 	// new leader commits, also for index=2
 	cfg.one(103, 2, true)
 
+	DPrintf("TESTACTION-2B6: new leader network failure")
 	// new leader network failure
 	leader2 := cfg.checkOneLeader()
 	cfg.disconnect(leader2)
 
+	DPrintf("TESTACTION-2B6: old leader connected again")
 	// old leader connected again
 	cfg.connect(leader1)
 
 	cfg.one(104, 2, true)
 
+	DPrintf("TESTACTION-2B6: all together now")
 	// all together now
 	cfg.connect(leader2)
 
@@ -381,12 +389,14 @@ func TestBackup2B(t *testing.T) {
 
 	cfg.one(rand.Int(), servers, true)
 
+	DPrintf("TESTACTION-2B7: put leader and one follower in a partition")
 	// put leader and one follower in a partition
 	leader1 := cfg.checkOneLeader()
 	cfg.disconnect((leader1 + 2) % servers)
 	cfg.disconnect((leader1 + 3) % servers)
 	cfg.disconnect((leader1 + 4) % servers)
 
+	DPrintf("TESTACTION-2B7: submit lots of commands that won't commit")
 	// submit lots of commands that won't commit
 	for i := 0; i < 50; i++ {
 		cfg.rafts[leader1].Start(rand.Int())
@@ -397,16 +407,19 @@ func TestBackup2B(t *testing.T) {
 	cfg.disconnect((leader1 + 0) % servers)
 	cfg.disconnect((leader1 + 1) % servers)
 
+	DPrintf("TESTACTION-2B7: allow other partition to recover")
 	// allow other partition to recover
 	cfg.connect((leader1 + 2) % servers)
 	cfg.connect((leader1 + 3) % servers)
 	cfg.connect((leader1 + 4) % servers)
 
+	DPrintf("TESTACTION-2B7: lots of successful commands to new group.")
 	// lots of successful commands to new group.
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
 
+	DPrintf("TESTACTION-2B7: now another partitioned leader and one follower")
 	// now another partitioned leader and one follower
 	leader2 := cfg.checkOneLeader()
 	other := (leader1 + 2) % servers
@@ -415,6 +428,7 @@ func TestBackup2B(t *testing.T) {
 	}
 	cfg.disconnect(other)
 
+	DPrintf("TESTACTION-2B7: lots more commands that won't commit")
 	// lots more commands that won't commit
 	for i := 0; i < 50; i++ {
 		cfg.rafts[leader2].Start(rand.Int())
@@ -422,6 +436,7 @@ func TestBackup2B(t *testing.T) {
 
 	time.Sleep(RaftElectionTimeout / 2)
 
+	DPrintf("TESTACTION-2B7: bring original leader back to life")
 	// bring original leader back to life,
 	for i := 0; i < servers; i++ {
 		cfg.disconnect(i)
@@ -430,11 +445,13 @@ func TestBackup2B(t *testing.T) {
 	cfg.connect((leader1 + 1) % servers)
 	cfg.connect(other)
 
+	DPrintf("TESTACTION-2B7: lots of successful commands to new group.")
 	// lots of successful commands to new group.
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
 
+	DPrintf("TESTACTION-2B7: now everyone")
 	// now everyone
 	for i := 0; i < servers; i++ {
 		cfg.connect(i)
