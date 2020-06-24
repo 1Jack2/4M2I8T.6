@@ -18,13 +18,17 @@ for !rf.killed() {
             }
             go func(i int) {
                 sendAppendEntries(i, args, reply)
+                // 根据reply做后续处理...
             }(i)
         }
     }
     time.sleep()
 }
-
 ```
+
+一般我们为每一个server创建一个goroutine（以下简称AE goroutine），周期性发送AppendEntries RPC（当处于leader状态时），实现heartbeat与log replication。故RPC调用不应该阻塞该AE goroutine，为每个RPC调用单独创建一个rpc goroutine，等到RPC调用返回时，根据论文Figure 2中的rules改变当前server的状态。比如改变nextIndex[]。  
+
+但是由于网络环境的不可靠，
 
 ## lab2B
 
