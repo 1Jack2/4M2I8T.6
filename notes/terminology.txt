@@ -55,14 +55,44 @@ Why serializability is popular
     They can write complex transactions while ignoring concurrency
   It allows parallel execution of transactions on different records
 
-## Two-Phase Locking
+## Simple locking & Two-phase locking
 
-Simple locking: lock *every* record before *any* use; release after abort/commit. 
+Simple locking: lock *every* record before *any* use; release after abort/commit.
+  The simple locking discipline has two rules. 
+    First, each transaction must acquire a lock for every shared data object it intends
+    to read or write before doing any actual reading and writing. 
+    Second, it may release its locks only after the transaction installs its last update and commits or completely restores the data and aborts.
 
-"Two-phase locking" is one way to implement serializability
+Two-phase locking: avoid the requirement that a transaction must know in advance which locks to acquire.
   2PL definition:
     a transaction must acquire a record's lock before using it
     a transaction must hold its locks until *after* commit or abort 
+
+Q: Why does it matter whether locks are held until after a transaction
+commits or aborts?
+
+A: If transactions release locks before they commit, it can be hard to
+avoid certain non-serializable executions due to aborts or crashes. In
+this example, suppose T1 releases the lock on x after it updates x,
+but before it commits:
+
+  T1:           T2:
+  x = x + 1
+                y = x
+                commit
+
+  commit
+  
+It can't be legal for y to end up greater than x. Yet if T1 releases
+its lock on x, then T2 acquires the lock, writes y, and commits, but
+then T1 aborts or the system crashes and cannot complete T1, we will
+end up with y greater than x.
+
+It's to avoid having to cope with the above that people use the
+"strong strict" variant of 2PL, which only releases locks after a
+commit or abort.
+
+## Two-phase commit
 
 Two-phase commit perspective
   Used in sharded DBs when a transaction uses data on multiple shards
@@ -75,3 +105,67 @@ Two-phase commit perspective
     E.g. not between banks, not between airlines, not over wide area
   Faster distributed transactions are an active research area.
 
+Q: How does a two-phase commit system undo modifications if a
+transaction has to abort?
+
+A: Each participant performs modifications to temporary copies of the
+records. If the participant answers "yes" to the TC's prepare message,
+the participant must first save the temporary record values to its log
+on disk, so it can find them if it crashes and restarts. If the TC
+decides to commit, the participant must copy the temporary values to
+the real database records; if the TC decides to abort, the participant
+must discard the temporary records.
+
+Q: How does serializability relate to linearizability?
+
+A: They are similar notions, arising from different communities. Both
+require the final outcome to be the same as some serial execution.
+Serializability usually refers to entire transactions, each involving
+multiple operations. Linearizability often refers to simple reads and
+writes. It's also the case that linearizability requires that the
+equivalent serial execution match the real time order of the actual
+execution, while serializability usually does not.
+
+Q: Why do logs appear so often in the designs we look at?
+
+A: One reason is that a log captures the serial order that the system
+has chosen for transactions, so that e.g. all replicas perform the
+transactions in the same order, or a server considers transactions in
+the same order after a crash+reboot as it did before the crash.
+
+Another reason is that a log is an efficient way to write data to hard
+disk or SSD, since both media are much faster at sequential writes
+(i.e. appends to the log) than at random writes.
+
+A third reason is that a log is a convenient way for crash-recovery
+software to see how far the system got before it crashed, and whether
+the last transactions have a complete record in the log and thus can
+safely be replayed. That is, a log is a convenient way to implement
+crash-recoverable atomic transactions, via write-ahead logging.
+
+Q: Are there structures other than logs that would work as well?
+
+A: There's nothing as general-purpose as logs.
+
+You can record order by storing data in some other way (e.g. a b-tree)
+and storing sequence numbers with the data (Frangipani does this for
+meta-data, in addition to using logs).
+
+You wouldn't have to worry about performance if you used a persistent
+storage system that was as fast for random updates as for sequential,
+for example battery-backed RAM. However, such systems are often more
+expensive and less robust than hard drives or SSDs.
+
+For the write-ahead property, you could store a mini-log for each data
+record. However, it might then be time-consuming for the
+crash-recovery software to find the full set of incomplete mini-logs.
+
+A different way to get crash-recoverable atomic operations is to
+prepare an entire new data structure in fresh storage, and then use a
+single commiting write to substitute it for the original data
+structure. This makes the most sense with tree- shaped data
+structures. The NetApp WAFL file system uses that idea:
+
+https://atg.netapp.com/wp-content/uploads/2000/01/file-system-design.pdf
+
+This arrangement may make it hard to support concurrent transactions.
