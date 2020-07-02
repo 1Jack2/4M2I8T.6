@@ -715,7 +715,7 @@ func TestFigure82C(t *testing.T) {
 	defer cfg.cleanup()
 
 	cfg.begin("Test (2C): Figure 8")
-
+	DPrintf("TESTACTION (2C): Figure 8 step1")
 	cfg.one(rand.Int(), 1, true)
 
 	nup := servers
@@ -752,7 +752,7 @@ func TestFigure82C(t *testing.T) {
 			}
 		}
 	}
-
+	DPrintf("TESTACTION (2C): Figure 8 step2")
 	for i := 0; i < servers; i++ {
 		if cfg.rafts[i] == nil {
 			cfg.start1(i)

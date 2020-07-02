@@ -7,9 +7,16 @@ import (
 	"../raft"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
-const Debug = 0
+const (
+	PUT = "Put"
+	GET = "Get"
+	APPEND = "Append"
+)
+
+const Debug = 1
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -23,6 +30,18 @@ type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	CommandType			string
+	CommandKey			string
+	CommandValue		string
+	ClerkId				int
+	CommandId			int
+	IsDup				bool
+	//PreCmdAllDone	int
+}
+
+func (op1 Op) equals(op2 Op) bool{
+	return op1.ClerkId == op2.ClerkId &&
+			op1.CommandId == op2.CommandId
 }
 
 type KVServer struct {
@@ -35,15 +54,87 @@ type KVServer struct {
 	maxraftstate int // snapshot if log grows this big
 
 	// Your definitions here.
+	kv				map[string]string
+	log				[]Op
+	lastApplied		int
+	clerkLatestCmd	map[int]int
 }
 
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+
+	op := Op{
+		CommandType:		GET,
+		CommandKey:			args.Key,
+		ClerkId:			args.ClerkId,
+		CommandId:			args.CommandId,
+	}
+	index, _, isLeader := kv.rf.Start(op)
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	for {
+		kv.mu.Lock()
+		if kv.lastApplied >= index {
+			logOp := kv.log[index]
+			if !op.equals(logOp) {
+				reply.Err = ErrWrongLeader
+				DPrintf("expected: %v\nactual: %v", op, logOp)
+			} else {
+				reply.Err = OK
+				if !logOp.IsDup {
+					reply.Value = logOp.CommandValue
+				} else {
+					DPrintf("GET dup")
+					for _, v := range kv.log {
+						if v.equals(logOp) {
+							reply.Value = v.CommandValue
+							break
+						}
+					}
+				}
+			}
+			kv.mu.Unlock()
+			return
+		}
+		kv.mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
+
+	op := Op {
+		CommandType:		args.Op,
+		CommandKey:			args.Key,
+		CommandValue:		args.Value,
+		ClerkId:			args.ClerkId,
+		CommandId:			args.CommandId,
+	}
+	index, _, isLeader := kv.rf.Start(op)
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	// DPrintf("isLeader: %t, index: %d", isLeader, index)
+	for {
+		kv.mu.Lock()
+		if kv.lastApplied >= index {
+			logOp := kv.log[index]
+			if !op.equals(logOp) {
+				reply.Err = ErrWrongLeader
+			} else {
+				reply.Err = OK
+			}
+			kv.mu.Unlock()
+			return
+		}
+		kv.mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 //
@@ -96,6 +187,61 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
 	// You may need initialization code here.
+	
+	kv.log = []Op{Op{}}
+	kv.kv = make(map[string]string)
+	kv.clerkLatestCmd = make(map[int]int)
+
+	go	checkApply(kv)
 
 	return kv
+}
+
+func checkApply(kv *KVServer) {
+	for applyMsg := range kv.applyCh {
+		kv.mu.Lock()
+		op := applyMsg.Command.(Op)
+
+		//检查是否是重复请求
+		var dup bool
+		lastId, ok := kv.clerkLatestCmd[op.ClerkId]
+		if !ok {
+			kv.clerkLatestCmd[op.ClerkId] = op.CommandId
+		} else if lastId >= op.CommandId {
+			DPrintf("kv[%d] drop dup op: %v", kv.me , op)
+			dup = true 
+			op.IsDup = true
+		} else {
+			// DPrintf("kv[%d] update clerkLatestCmd[%d]: %d", kv.me , op.ClerkId, op.CommandId)
+			kv.clerkLatestCmd[op.ClerkId] = op.CommandId
+		}
+		// if len(kv.log) - 1 < applyMsg.CommandIndex {
+		// 	kv.log = append(kv.log, op)
+		// }
+		kv.log = append(kv.log, op)
+		if !dup {
+			if op.CommandType == GET {
+				val, ok := kv.kv[op.CommandKey]
+				if !ok {
+					kv.log[applyMsg.CommandIndex].CommandValue = ""
+				} else {
+					kv.log[applyMsg.CommandIndex].CommandValue = val
+				}
+			} else if op.CommandType == PUT {
+				kv.kv[op.CommandKey] = op.CommandValue
+			} else { //APPEND
+				_, ok := kv.kv[op.CommandKey]
+				if !ok {
+					kv.kv[op.CommandKey] = op.CommandValue
+				} else {
+					//DPrintf(kv.kv[op.CommandKey])
+					kv.kv[op.CommandKey] += op.CommandValue
+					//DPrintf(kv.kv[op.CommandKey])
+				}
+			}
+		}
+		DPrintf("kv[%d] applied op: %v", kv.me , kv.log[applyMsg.CommandIndex])
+		kv.lastApplied++
+		kv.mu.Unlock()
+	}
 }

@@ -245,7 +245,8 @@ func (rf * Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesRepl
 		}(args.LeaderCommit, len(rf.log) - 1)
 	}
 	reply.Success = true
-	DPrintf("[%d-->%d AE success] log[%d].Term: {%d}, leader[%d].Term: %d", args.LeaderId, rf.me, 
+	// lab3
+ 	DPrintf("[%d-->%d AE success] log[%d].Term: {%d}, leader[%d].Term: %d", args.LeaderId, rf.me, 
 		args.PrevLogIndex, rf.log[args.PrevLogIndex].Term, args.PrevLogIndex, args.PrevLogTerm)
 } 
 
@@ -371,7 +372,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
-	isLeader := true
+	isLeader := false
 
 	// Your code here (2B).
 
@@ -439,10 +440,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// Your initialization code here (2A, 2B, 2C).
 
-	DPrintf("[%d] Make()", me)
 	rf.applyCh = applyCh
 	rf.electionTimeout = time.Duration(500 + rand.Intn(1000)) * time.Millisecond 
-	//rf.electionTimeout = time.Duration(500 + me * 500) * time.Millisecond
 	DPrintln("server ", rf.me, "electionTimeout ", rf.electionTimeout)
 	rf.lastHeartbeat = time.Now()
 	rf.state = FOLLOWER
@@ -450,15 +449,13 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.votedFor = -1
 	rf.log = []LogEntry{LogEntry{Term: 0}} //log's first index is 1
 	rf.commitIndex = 0
-	// rf.commandCommitIndex = 0
-	// rf.lastCommandIndex = 0
 	rf.lastApplied = 0
 	rf.nextIndex = make([]int, len(peers))
 	rf.matchIndex = make([]int, len(peers))
 	
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-	DPrintf("[%d] state: %d, term: %d, votedFor: %d, log: %v", me, rf.state, rf.currentTerm, rf.votedFor, rf.log)
+	DPrintf("[%d] state: %d, term: %d, votedFor: %d, log: %v, log len: %d", me, rf.state, rf.currentTerm, rf.votedFor, rf.log, len(rf.log))
 
 	for j := len(rf.peers) - 1; j >= 0; j-- {
 		rf.nextIndex[j] = len(rf.log)
@@ -595,16 +592,12 @@ func sendHeartbeat(rf *Raft) {
 		
 
 		rf.mu.Lock()
-		
 		if rf.state == LEADER {
 			mu := sync.Mutex{}
 			replCount := 1
-			// if len(rf.log) - 1 == rf.commitIndex {
-			// 	rf.log = append(rf.log, LogEntry{Term: rf.currentTerm})
-			// }
-			// currentState := rf.state
 			currentTerm := rf.currentTerm
 			currentLogLen := len(rf.log)
+			changeCommit := rf.log[currentLogLen - 1].Term == currentTerm
 			currentCommitIndex := rf.commitIndex
 			rf.mu.Unlock()
 			for i := range rf.peers {
@@ -627,26 +620,10 @@ func sendHeartbeat(rf *Raft) {
 							PrevLogTerm:		rf.log[rf.nextIndex[i] - 1].Term,
 							LeaderCommit: 		currentCommitIndex,
 						}
-						// if appendEntriesArgs.PrevLogIndex >= 0 {
-						// 	appendEntriesArgs.PrevLogTerm = rf.log[appendEntriesArgs.PrevLogIndex].Term
-						// }
 						if rf.nextIndex[i] < currentLogLen {
-							// if rf.nextIndex[i] >= 0 {
-							// 	entriesCopy := make([]LogEntry, len(rf.log[rf.nextIndex[i] : currentLogLen]))
-							// 	copy(entriesCopy, rf.log[rf.nextIndex[i] : currentLogLen])
-							// 	appendEntriesArgs.Entries = entriesCopy
-							// 	//appendEntriesArgs.Entries = rf.log[rf.nextIndex[i] : currentLogLen]
-							// } else {
-							// 	entriesCopy := make([]LogEntry, len(rf.log[:currentLogLen]))
-							// 	copy(entriesCopy, rf.log[:currentLogLen])
-							// 	appendEntriesArgs.Entries = entriesCopy
-							// 	//appendEntriesArgs.Entries = rf.log[: currentLogLen]
-							// }
-
 							entriesCopy := make([]LogEntry, len(rf.log[rf.nextIndex[i] : currentLogLen]))
 							copy(entriesCopy, rf.log[rf.nextIndex[i] : currentLogLen])
 							appendEntriesArgs.Entries = entriesCopy
-							// appendEntriesArgs.Entries = rf.log[rf.nextIndex[i] : currentLogLen]
 						}
 						rf.mu.Unlock()
 
@@ -708,12 +685,10 @@ func sendHeartbeat(rf *Raft) {
 							mu.Lock()
 							replCount++
 							nextCommitIndex := currentLogLen - 1
-							if 2 * replCount > len(rf.peers) && rf.commitIndex < nextCommitIndex {
+							if changeCommit && 2 * replCount > len(rf.peers) && rf.commitIndex < nextCommitIndex {
 								rf.commitIndex = nextCommitIndex
-								// rf.persist()
 							}
 							mu.Unlock()
-							// rf.matchIndex[i] = len(rf.log) - 1
 							// DPrintf("[%d] --> [%d]", rf.me, i);
 						}
 						rf.mu.Unlock()
@@ -723,34 +698,30 @@ func sendHeartbeat(rf *Raft) {
 		} else {
 			rf.mu.Unlock()	
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
 func checkApply(rf *Raft) {
 	for !rf.killed() {
 		rf.mu.Lock()
-		if rf.lastApplied < rf.commitIndex {
+		for rf.lastApplied < rf.commitIndex {
 			// DPrintf("rf.lastApplied: {%d}, rf.commitIndex: {%d}", rf.lastApplied, rf.commitIndex)
 			rf.lastApplied++
-			// rf.persist()
 			commandIndex := rf.lastApplied
 			command := rf.log[commandIndex].Command
-			//if command != nil {
-				// rf.commandCommitIndex++
-				// if rf.lastCommandIndex < rf.commandCommitIndex {
-				// 	rf.lastCommandIndex = rf.commandCommitIndex
-				// }
-				applyMsg := ApplyMsg{
-					Command:		command,
-					CommandIndex:	commandIndex,
-					CommandValid:	true,
-				}
-				go func(applyMsg ApplyMsg) {
-					rf.applyCh <- applyMsg
-				}(applyMsg)
-				DPrintf("[%d]<%d> applied command[%d]: %v", rf.me, rf.currentTerm, commandIndex, command)
-			//}
+			applyMsg := ApplyMsg{
+				Command:		command,
+				CommandIndex:	commandIndex,
+				CommandValid:	true,
+			}
+			// bug： 后创建的goroutine可能会比先创建的goroutine先执行，破坏了发送给applyChan的command的顺序。6.824 Spring 2017 Exam1 page10
+			// go func(applyMsg ApplyMsg) {
+			// 	rf.applyCh <- applyMsg
+			// }(applyMsg)
+			rf.applyCh <- applyMsg
+			// lab3 
+			DPrintf("[%d]<%d> applied command[%d]: %v", rf.me, rf.currentTerm, commandIndex, command)
 		}
 		rf.mu.Unlock()
 

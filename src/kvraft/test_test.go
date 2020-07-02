@@ -206,12 +206,12 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			for atomic.LoadInt32(&done_clients) == 0 {
 				if (rand.Int() % 1000) < 500 {
 					nv := "x " + strconv.Itoa(cli) + " " + strconv.Itoa(j) + " y"
-					// log.Printf("%d: client new append %v\n", cli, nv)
+					log.Printf("%d: client new append %v\n", cli, nv)
 					Append(cfg, myck, key, nv)
 					last = NextValue(last, nv)
 					j++
 				} else {
-					// log.Printf("%d: client new get %v\n", cli, key)
+					log.Printf("%d: client new get %v\n", cli, key)
 					v := Get(cfg, myck, key)
 					if v != last {
 						log.Fatalf("get wrong value, key %v, wanted:\n%v\n, got\n%v\n", key, last, v)
@@ -231,7 +231,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		atomic.StoreInt32(&done_partitioner, 1) // tell partitioner to quit
 
 		if partitions {
-			// log.Printf("wait for partitioner\n")
+			log.Printf("wait for partitioner\n")
 			<-ch_partitioner
 			// reconnect network and submit a request. A client may
 			// have submitted a request in a minority.  That request
@@ -239,6 +239,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			// has started.
 			cfg.ConnectAll()
 			// wait for a while so that we have a new term
+			log.Printf("wait for a while so that we have a new term\n")
 			time.Sleep(electionTimeout)
 		}
 
@@ -258,15 +259,15 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			cfg.ConnectAll()
 		}
 
-		// log.Printf("wait for clients\n")
+		log.Printf("wait for clients\n")
 		for i := 0; i < nclients; i++ {
-			// log.Printf("read from clients %d\n", i)
+			log.Printf("read from clients %d\n", i)
 			j := <-clnts[i]
 			// if j < 10 {
 			// 	log.Printf("Warning: client %d managed to perform only %d put operations in 1 sec?\n", i, j)
 			// }
 			key := strconv.Itoa(i)
-			// log.Printf("Check %v for client %d\n", j, i)
+			log.Printf("Check %v for client %d\n", j, i)
 			v := Get(cfg, ck, key)
 			checkClntAppends(t, i, v, j)
 		}
@@ -447,16 +448,19 @@ func GenericTestLinearizability(t *testing.T, part string, nclients int, nserver
 
 func TestBasic3A(t *testing.T) {
 	// Test: one client (3A) ...
+	DPrintf("TESTACTION: one client (3A) ...")
 	GenericTest(t, "3A", 1, false, false, false, -1)
 }
 
 func TestConcurrent3A(t *testing.T) {
 	// Test: many clients (3A) ...
+	DPrintf("TESTACTION: many clients (3A) ...")
 	GenericTest(t, "3A", 5, false, false, false, -1)
 }
 
 func TestUnreliable3A(t *testing.T) {
 	// Test: unreliable net, many clients (3A) ...
+	DPrintf("TESTACTION: unreliable net, many clients (3A) ...")
 	GenericTest(t, "3A", 5, true, false, false, -1)
 }
 
@@ -564,7 +568,6 @@ func TestOnePartition3A(t *testing.T) {
 		t.Fatalf("Get did not complete")
 	default:
 	}
-
 	check(cfg, t, ck, "1", "15")
 
 	cfg.end()
@@ -572,41 +575,49 @@ func TestOnePartition3A(t *testing.T) {
 
 func TestManyPartitionsOneClient3A(t *testing.T) {
 	// Test: partitions, one client (3A) ...
+	DPrintf("TESTACTION: partitions, one client (3A) ...")
 	GenericTest(t, "3A", 1, false, false, true, -1)
 }
 
 func TestManyPartitionsManyClients3A(t *testing.T) {
 	// Test: partitions, many clients (3A) ...
+	DPrintf("TESTACTION: partitions, many clients (3A) ...")
 	GenericTest(t, "3A", 5, false, false, true, -1)
 }
 
 func TestPersistOneClient3A(t *testing.T) {
 	// Test: restarts, one client (3A) ...
+	DPrintf("TESTACTION: restarts, one client (3A) ...")
 	GenericTest(t, "3A", 1, false, true, false, -1)
 }
 
 func TestPersistConcurrent3A(t *testing.T) {
 	// Test: restarts, many clients (3A) ...
+	DPrintf("TESTACTION: restarts, many clients (3A) ...")
 	GenericTest(t, "3A", 5, false, true, false, -1)
 }
 
 func TestPersistConcurrentUnreliable3A(t *testing.T) {
 	// Test: unreliable net, restarts, many clients (3A) ...
+	DPrintf("TESTACTION: unreliable net, restarts, many clients (3A) ...")
 	GenericTest(t, "3A", 5, true, true, false, -1)
 }
 
 func TestPersistPartition3A(t *testing.T) {
 	// Test: restarts, partitions, many clients (3A) ...
+	DPrintf("TESTACTION: restarts, partitions, many clients (3A) ...")
 	GenericTest(t, "3A", 5, false, true, true, -1)
 }
 
 func TestPersistPartitionUnreliable3A(t *testing.T) {
 	// Test: unreliable net, restarts, partitions, many clients (3A) ...
+	DPrintf("TESTACTION: unreliable net, restarts, partitions, many clients (3A) ...")
 	GenericTest(t, "3A", 5, true, true, true, -1)
 }
 
 func TestPersistPartitionUnreliableLinearizable3A(t *testing.T) {
 	// Test: unreliable net, restarts, partitions, linearizability checks (3A) ...
+	DPrintf("TESTACTION: unreliable net, restarts, partitions, linearizability checks (3A) ...")
 	GenericTestLinearizability(t, "3A", 15, 7, true, true, true, -1)
 }
 
