@@ -1,7 +1,5 @@
 # Terminology
 
-## Linearizability
-
 ## Byzantine & Non-Byzantine
 
 Q: The paper mentions that Raft works under all non-Byzantine
